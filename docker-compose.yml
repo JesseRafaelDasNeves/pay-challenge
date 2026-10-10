@@ -1,0 +1,35 @@
+name: pay-challenge
+version: "3.9"
+
+services:
+  postgres-pay-challenge:
+    image: postgres:18.1
+    container_name: pay_challenge_pg
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PAY_CHALLENGE_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_PAY_CHALLENGE_USER}
+      POSTGRES_DB: ${POSTGRES_PAY_CHALLENGE_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgrebd_pay_challenge:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_PAY_CHALLENGE_USER} -d ${POSTGRES_PAY_CHALLENGE_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:3.8.1
+    container_name: pay_challenge_localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs
+      - AWS_DEFAULT_REGION=${AWS_REGION}
+    volumes:
+      - "./scripts/init-sqs.sh:/etc/localstack/init/ready.d/init-sqs.sh"
+
+volumes:
+  postgrebd_pay_challenge:
+    external: false
