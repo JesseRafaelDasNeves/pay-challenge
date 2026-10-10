@@ -1,5 +1,5 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { DataSource } from 'typeorm';
 import { GetQueueAttributesCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { SqsPublisherService } from '../../messaging/sqs/sqs-publisher.service.js';

@@ -9,7 +9,7 @@ import {
   Post,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { SubmitWagerTransactionDto } from '../../../application/dtos/submit-wager-transaction.dto.js';
 import { ProcessWagerTransactionUseCase } from '../../../application/use-cases/process-wager-transaction.use-case.js';
 import { GetWagerTransactionUseCase } from '../../../application/use-cases/get-wager-transaction.use-case.js';
