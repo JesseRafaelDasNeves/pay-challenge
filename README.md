@@ -22,19 +22,19 @@ Consulte o documento completo de decisões técnicas em [ARCHITECTURE.md](ARCHIT
 ### Variáveis de Ambiente (`.env`)
 
 ```env
-POSTGRES_PAY_CHALLENGE_DB="pay-challenge"
-POSTGRES_PAY_CHALLENGE_USER="api-pay-challenge"
-POSTGRES_PAY_CHALLENGE_PASSWORD="123456"
+POSTGRES_PAY_CHALLENGE_DB="xxx"
+POSTGRES_PAY_CHALLENGE_USER="xxx"
+POSTGRES_PAY_CHALLENGE_PASSWORD="xxx"
 
 # AWS SQS
-AWS_REGION="us-east-1"
-AWS_ENDPOINT="http://localhost:4566"
-AWS_ACCESS_KEY_ID="test"
-AWS_SECRET_ACCESS_KEY="test"
+AWS_REGION="xxx"
+AWS_ENDPOINT="xxx"
+AWS_ACCESS_KEY_ID="xxx"
+AWS_SECRET_ACCESS_KEY="xxx"
 
 # URLs das Filas SQS
-SQS_WAGER_TRANSACTIONS_QUEUE_URL="http://localhost:4566/000000000000/wager-transactions.fifo"
-SQS_WAGER_TRANSACTIONS_DLQ_URL="http://localhost:4566/000000000000/wager-transactions-dlq.fifo"
+SQS_WAGER_TRANSACTIONS_QUEUE_URL="xxx"
+SQS_WAGER_TRANSACTIONS_DLQ_URL="xxx"
 ```
 
 ---
