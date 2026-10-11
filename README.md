@@ -13,7 +13,7 @@ Serviço financeiro distribuído de alta consistência para processamento de apo
 - **Arquitetura**: Clean Architecture (Ports & Adapters) + DDD (Domain-Driven Design)
 - **Padrões de Resiliência**: Transactional Inbox, Transactional Outbox com `FOR UPDATE SKIP LOCKED`, Lock Pessimista por Carteira (`SELECT ... FOR UPDATE`), Idempotência Persistente baseada em Hash Canônico SHA-256.
 
-Consulte o documento completo de decisões técnicas em [ARCHITECTURE.md](ARCHITECTURE.md).
+Consulte o documento completo de decisões técnicas em [ARCHITECTURE.md](ARCHITECTURE.md) e o fluxo detalhado de processamento de transações em [docs/wagering-transactions-flow.md](docs/wagering-transactions-flow.md).
 
 ---
 
@@ -135,6 +135,8 @@ bun run test:concurrency
 ---
 
 ### 2. Transações de Apostas (`/wagering`)
+
+> 📖 **Documentação de Fluxo**: Para visualizar diagramas de sequência, fluxograma de decisão e o ciclo de vida completo dos dados (PostgreSQL + SQS FIFO), consulte [docs/wagering-transactions-flow.md](docs/wagering-transactions-flow.md).
 
 #### Submeter Transação de Aposta
 - **`POST /wagering/transactions`**
