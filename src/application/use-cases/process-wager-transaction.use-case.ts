@@ -1,12 +1,18 @@
 import {
   Inject,
   Injectable,
+  Logger,
+  Optional,
   ConflictException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { UNIT_OF_WORK_PORT, type UnitOfWorkPort } from '../ports/unit-of-work.port.js';
+import {
+  METRICS_COLLECTOR_PORT,
+  type MetricsCollectorPort,
+} from '../ports/metrics-collector.port.js';
 import { Money, MoneyProps } from '../../domain/shared/money.value-object.js';
 import { WagerTransactionKind } from '../../domain/wagering/wager-transaction-kind.enum.js';
 import { WagerTransactionStatus } from '../../domain/wagering/wager-transaction-status.enum.js';
@@ -50,17 +56,35 @@ export interface ProcessWagerTransactionResult {
 
 @Injectable()
 export class ProcessWagerTransactionUseCase {
+  private readonly logger = new Logger(ProcessWagerTransactionUseCase.name);
+
   constructor(
     @Inject(UNIT_OF_WORK_PORT)
     private readonly unitOfWork: UnitOfWorkPort,
+    @Optional()
+    @Inject(METRICS_COLLECTOR_PORT)
+    private readonly metrics?: MetricsCollectorPort,
   ) {}
 
   public async execute(
     command: ProcessWagerTransactionCommand,
   ): Promise<ProcessWagerTransactionResult> {
+    const startMs = Date.now();
     const money = Money.from(command.money);
     const correlationId = command.correlationId || randomUUID();
     const now = new Date();
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'TRANSACTION_PROCESSING_STARTED',
+        correlationId,
+        messageId: command.consumerMessageId ?? null,
+        providerId: command.providerId,
+        externalTransactionId: command.externalTransactionId,
+        walletId: command.walletId,
+        kind: command.kind,
+      }),
+    );
 
     // 1. Hash canônico para integridade de idempotência
     const payloadToHash = {
@@ -79,6 +103,102 @@ export class ProcessWagerTransactionUseCase {
     };
     const payloadHash = computePayloadHash(payloadToHash);
 
+    try {
+      const result = await this.executeInternal(command, correlationId, now, payloadHash, money);
+      const durationMs = Date.now() - startMs;
+
+      if (result.idempotentReplay) {
+        this.metrics?.recordDuplicateDetected();
+        this.logger.log(
+          JSON.stringify({
+            event: 'TRANSACTION_IDEMPOTENT_REPLAY',
+            correlationId,
+            messageId: command.consumerMessageId ?? null,
+            transactionId: result.transactionId,
+            providerId: command.providerId,
+            walletId: command.walletId,
+            status: result.status,
+            durationMs,
+          }),
+        );
+      } else if (result.status === WagerTransactionStatus.Rejected) {
+        this.metrics?.recordTransaction(result.status, durationMs);
+        this.logger.warn(
+          JSON.stringify({
+            event: 'TRANSACTION_REJECTED',
+            correlationId,
+            messageId: command.consumerMessageId ?? null,
+            transactionId: result.transactionId,
+            providerId: command.providerId,
+            walletId: command.walletId,
+            kind: command.kind,
+            failureCode: result.failureCode,
+            durationMs,
+          }),
+        );
+      } else if (result.status === WagerTransactionStatus.PendingReference) {
+        this.metrics?.recordTransaction(result.status, durationMs);
+        this.logger.log(
+          JSON.stringify({
+            event: 'TRANSACTION_PENDING_REFERENCE',
+            correlationId,
+            messageId: command.consumerMessageId ?? null,
+            transactionId: result.transactionId,
+            providerId: command.providerId,
+            walletId: command.walletId,
+            kind: command.kind,
+            referenceExternalTransactionId: command.referenceExternalTransactionId ?? null,
+            durationMs,
+          }),
+        );
+      } else {
+        this.metrics?.recordTransaction(result.status, durationMs);
+        this.logger.log(
+          JSON.stringify({
+            event: 'TRANSACTION_PROCESSED',
+            correlationId,
+            messageId: command.consumerMessageId ?? null,
+            transactionId: result.transactionId,
+            providerId: command.providerId,
+            walletId: command.walletId,
+            kind: command.kind,
+            durationMs,
+          }),
+        );
+      }
+
+      return result;
+    } catch (error: any) {
+      const durationMs = Date.now() - startMs;
+      if (
+        !(error instanceof ConflictException) &&
+        !(error instanceof NotFoundException) &&
+        !(error instanceof UnprocessableEntityException)
+      ) {
+        this.metrics?.recordTransaction(WagerTransactionStatus.Failed, durationMs);
+      }
+      this.logger.error(
+        JSON.stringify({
+          event: 'TRANSACTION_PROCESSING_FAILED',
+          correlationId,
+          messageId: command.consumerMessageId ?? null,
+          providerId: command.providerId,
+          walletId: command.walletId,
+          error: error?.message || String(error),
+          durationMs,
+        }),
+      );
+      throw error;
+    }
+  }
+
+  private async executeInternal(
+    command: ProcessWagerTransactionCommand,
+    correlationId: string,
+    now: Date,
+    payloadHash: string,
+    money: Money,
+  ): Promise<ProcessWagerTransactionResult> {
     // 2. Execução dentro da transação atômica gerenciada por UnitOfWork
     try {
       return await this.unitOfWork.executeInTransaction(async (ctx) => {
@@ -511,6 +631,16 @@ export class ProcessWagerTransactionUseCase {
     } catch (error: any) {
       // Tratamento de race condition em Unique Constraint (código PostgreSQL 23505)
       if (error?.code === '23505' || String(error?.message).includes('uq_wager_tx')) {
+        this.metrics?.recordLockConflict();
+        this.logger.warn(
+          JSON.stringify({
+            event: 'TRANSACTION_LOCK_COLLISION_RESOLVED',
+            correlationId,
+            providerId: command.providerId,
+            externalTransactionId: command.externalTransactionId,
+            idempotencyKey: command.idempotencyKey,
+          }),
+        );
         return this.unitOfWork.executeInTransaction(async (ctx) => {
           let existingTx = await ctx.transactions.findByIdempotencyKey(command.idempotencyKey);
           if (!existingTx) {

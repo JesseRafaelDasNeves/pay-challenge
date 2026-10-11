@@ -168,7 +168,74 @@ bun run test:concurrency
 
 ---
 
-### 3. Health Checks
+### 3. Health Checks (`/health`)
 
 - **`GET /health/live`** — Processo em execução.
 - **`GET /health/ready`** — Testa conectividade ativa com PostgreSQL e LocalStack SQS FIFO.
+
+---
+
+### 4. Observabilidade e Métricas (`/metrics`)
+
+Endpoints dedicados para monitoramento em tempo real da saúde financeira e operacional do processador:
+
+#### Snapshot Consolidado
+- **`GET /metrics`**
+- **Resposta (200 OK):**
+  ```json
+  {
+    "timestamp": "2026-10-11T15:30:00.000Z",
+    "uptimeSeconds": 120.5,
+    "transactions": {
+      "byStatus": {
+        "PROCESSED": 45,
+        "REJECTED": 5,
+        "PENDING_REFERENCE": 2,
+        "FAILED": 0,
+        "PENDING": 0
+      },
+      "total": 52
+    },
+    "idempotency": {
+      "duplicatesDetected": 8
+    },
+    "concurrency": {
+      "lockConflicts": 3
+    },
+    "retries": {
+      "sqsConsumerRetries": 1,
+      "outboxRetries": 2,
+      "pendingReferencesRetries": 4,
+      "total": 7
+    },
+    "messaging": {
+      "dlq": {
+        "approximateNumberOfMessages": 0,
+        "approximateNumberOfMessagesNotVisible": 0,
+        "status": "connected"
+      },
+      "outboxLag": {
+        "pendingCount": 0,
+        "oldestPendingAgeSeconds": 0
+      }
+    },
+    "latency": {
+      "transactionProcessingMs": {
+        "count": 52,
+        "min": 4.2,
+        "avg": 14.5,
+        "max": 85.1,
+        "p50": 12.0,
+        "p95": 32.5,
+        "p99": 68.0
+      }
+    }
+  }
+  ```
+
+#### Endpoints Específicos
+- **`GET /metrics/transactions`** — Detalhamento de transações por status, duplicatas detectadas e conflitos de concorrência.
+- **`GET /metrics/messaging`** — Monitoramento de filas (mensagens na DLQ, Outbox lag e retries por componente).
+- **`GET /metrics/latency`** — Estatísticas de latência de processamento de transações com percentis (`p50`, `p95`, `p99`, `avg`, `min`, `max`).
+- **`GET /metrics/prometheus`** — Exportação no formato texto padrão Prometheus (`text/plain; version=0.0.4`) para integração com Prometheus e Grafana.
+

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { DeleteMessageCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -6,6 +6,10 @@ import { SqsPublisherService } from './sqs-publisher.service.js';
 import { envConfig } from '../../config/env.config.js';
 import { ProcessWagerTransactionUseCase } from '../../../application/use-cases/process-wager-transaction.use-case.js';
 import { SqsWagerMessageDto } from '../../../application/dtos/sqs-wager-message.dto.js';
+import {
+  METRICS_COLLECTOR_PORT,
+  type MetricsCollectorPort,
+} from '../../../application/ports/metrics-collector.port.js';
 
 @Injectable()
 export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
@@ -17,6 +21,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly sqsPublisher: SqsPublisherService,
     private readonly processWagerUseCase: ProcessWagerTransactionUseCase,
+    @Optional()
+    @Inject(METRICS_COLLECTOR_PORT)
+    private readonly metrics?: MetricsCollectorPort,
   ) {
     this.client = this.sqsPublisher.getClient();
   }
@@ -71,7 +78,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
       if (errors.length > 0) {
         this.logger.error(
-          `Payload de mensagem SQS inválido. Erros: ${JSON.stringify(errors.map((e) => e.constraints))}`,
+          JSON.stringify({
+            event: 'SQS_MESSAGE_PAYLOAD_INVALID',
+            messageId: msg.MessageId,
+            errors: errors.map((e) => e.constraints),
+          }),
         );
         // Não dá ACK em mensagem malformada caso queira análise manual ou deixa expirar para DLQ
         return;
@@ -80,6 +91,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       const txData = dto.data;
       const idempotencyKey =
         txData.idempotencyKey || `${txData.providerId}:${txData.externalTransactionId}`;
+      const correlationId = dto.messageId || txData.idempotencyKey || msg.MessageId;
 
       // Executa o use case compartilhado na mesma transação atômica
       await this.processWagerUseCase.execute({
@@ -95,6 +107,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
         referenceExternalTransactionId: txData.referenceExternalTransactionId,
         consumerName: 'wager-transactions-consumer',
         consumerMessageId: msg.MessageId || dto.messageId,
+        correlationId,
       });
 
       // ACK somente após o commit com sucesso no PostgreSQL
@@ -106,8 +119,13 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (error: any) {
       // Erros transitórios de banco ou rede não dão ACK, permitindo reentrega com backoff ou DLQ
+      this.metrics?.recordRetry('sqs');
       this.logger.error(
-        `Falha ao processar mensagem SQS ${msg.MessageId}: ${error?.message || error}. Mensagem será reprocessada.`,
+        JSON.stringify({
+          event: 'SQS_MESSAGE_PROCESSING_FAILED',
+          messageId: msg.MessageId,
+          error: error?.message || String(error),
+        }),
       );
     }
   }

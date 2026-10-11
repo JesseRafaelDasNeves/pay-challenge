@@ -1,8 +1,12 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import {
   OUTBOX_REPOSITORY_PORT,
   type OutboxRepositoryPort,
 } from '../../../application/ports/outbox.repository.port.js';
+import {
+  METRICS_COLLECTOR_PORT,
+  type MetricsCollectorPort,
+} from '../../../application/ports/metrics-collector.port.js';
 import { SqsPublisherService } from '../sqs/sqs-publisher.service.js';
 import { envConfig } from '../../config/env.config.js';
 
@@ -17,6 +21,9 @@ export class OutboxPublisherJob implements OnModuleInit, OnModuleDestroy {
     @Inject(OUTBOX_REPOSITORY_PORT)
     private readonly outboxRepository: OutboxRepositoryPort,
     private readonly sqsPublisher: SqsPublisherService,
+    @Optional()
+    @Inject(METRICS_COLLECTOR_PORT)
+    private readonly metrics?: MetricsCollectorPort,
   ) {}
 
   public onModuleInit(): void {
@@ -61,9 +68,25 @@ export class OutboxPublisherJob implements OnModuleInit, OnModuleDestroy {
           msg.markPublished(new Date());
           await this.outboxRepository.update(msg);
           publishedCount++;
+
+          this.logger.log(
+            JSON.stringify({
+              event: 'OUTBOX_MESSAGE_PUBLISHED',
+              outboxId: msg.id,
+              aggregateId: msg.aggregateId,
+              eventType: msg.eventType,
+            }),
+          );
         } catch (error: any) {
+          this.metrics?.recordRetry('outbox');
           this.logger.warn(
-            `Falha ao despachar mensagem outbox ${msg.id} para SQS: ${error?.message || error}. Agendando retentativa.`,
+            JSON.stringify({
+              event: 'OUTBOX_MESSAGE_PUBLISH_FAILED',
+              outboxId: msg.id,
+              aggregateId: msg.aggregateId,
+              attempts: msg.attempts + 1,
+              error: error?.message || String(error),
+            }),
           );
           msg.scheduleRetry(new Date(), error?.message || String(error));
           await this.outboxRepository.update(msg);

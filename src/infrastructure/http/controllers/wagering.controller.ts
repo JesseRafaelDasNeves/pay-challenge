@@ -25,12 +25,15 @@ export class WageringController {
   @Post('wagering/transactions')
   public async submitTransaction(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Headers('x-correlation-id') correlationIdHeader: string | undefined,
     @Body() dto: SubmitWagerTransactionDto,
     @Res() res: Response,
   ) {
     if (!idempotencyKey || !idempotencyKey.trim()) {
       throw new BadRequestException('O header Idempotency-Key é obrigatório.');
     }
+
+    const correlationId = correlationIdHeader?.trim() || idempotencyKey.trim();
 
     const result = await this.processWagerUseCase.execute({
       idempotencyKey: idempotencyKey.trim(),
@@ -43,6 +46,7 @@ export class WageringController {
       kind: dto.toDomainKind(),
       money: dto.money,
       referenceExternalTransactionId: dto.referenceExternalTransactionId,
+      correlationId,
     });
 
     let httpStatus = 200;
