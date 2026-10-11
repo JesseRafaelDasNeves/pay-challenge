@@ -13,7 +13,10 @@ Serviço financeiro distribuído de alta consistência para processamento de apo
 - **Arquitetura**: Clean Architecture (Ports & Adapters) + DDD (Domain-Driven Design)
 - **Padrões de Resiliência**: Transactional Inbox, Transactional Outbox com `FOR UPDATE SKIP LOCKED`, Lock Pessimista por Carteira (`SELECT ... FOR UPDATE`), Idempotência Persistente baseada em Hash Canônico SHA-256.
 
-Consulte o documento completo de decisões técnicas em [ARCHITECTURE.md](ARCHITECTURE.md) e o fluxo detalhado de processamento de transações em [docs/wagering-transactions-flow.md](docs/wagering-transactions-flow.md).
+Consulte a documentação técnica detalhada do projeto:
+- 🏛️ **Decisões Técnicas & Arquitetura**: [ARCHITECTURE.md](ARCHITECTURE.md)
+- 🗄️ **Modelagem do Banco de Dados & Invariantes**: [docs/database-modeling.md](docs/database-modeling.md)
+- 🔄 **Fluxo do Endpoint de Transações**: [docs/wagering-transactions-flow.md](docs/wagering-transactions-flow.md)
 
 ---
 
@@ -52,7 +55,7 @@ bun install
 ```
 
 ### 3. Executar Migrations do Banco de Dados
-Aplica o schema completo, constraints `CHECK`, índices únicos parciais e o trigger de imutabilidade do ledger:
+Aplica o schema completo, constraints `CHECK`, índices únicos parciais e o trigger de imutabilidade do ledger (especificação detalhada em [docs/database-modeling.md](docs/database-modeling.md)):
 ```bash
 bun run migration:run
 ```
