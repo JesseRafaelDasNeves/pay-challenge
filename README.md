@@ -6,10 +6,10 @@ Serviço financeiro distribuído de alta consistência para processamento de apo
 
 ## 🚀 Tecnologias e Arquitetura
 
-- **Runtime & Test Runner**: [Bun 1.x](https://bun.sh)
-- **Framework**: [NestJS](https://nestjs.com)
-- **ORM & Banco de Dados**: [TypeORM](https://typeorm.io) com [PostgreSQL](https://www.postgresql.org)
-- **Mensageria**: AWS SQS FIFO emulado via [LocalStack](https://localstack.cloud)
+- **Runtime & Test Runner**: [Bun 1.4.2](https://bun.sh)
+- **Framework**: [NestJS 12.1.2](https://nestjs.com)
+- **ORM & Banco de Dados**: [TypeORM](https://typeorm.io) com [PostgreSQL 18.1](https://www.postgresql.org)
+- **Mensageria**: AWS SQS FIFO emulado via [LocalStack 3.8.1](https://localstack.cloud)
 - **Arquitetura**: Clean Architecture (Ports & Adapters) + DDD (Domain-Driven Design)
 - **Padrões de Resiliência**: Transactional Inbox, Transactional Outbox com `FOR UPDATE SKIP LOCKED`, Lock Pessimista por Carteira (`SELECT ... FOR UPDATE`), Idempotência Persistente baseada em Hash Canônico SHA-256.
 
