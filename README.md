@@ -14,6 +14,7 @@ Serviço financeiro distribuído de alta consistência para processamento de apo
 - **Padrões de Resiliência**: Transactional Inbox, Transactional Outbox com `FOR UPDATE SKIP LOCKED`, Lock Pessimista por Carteira (`SELECT ... FOR UPDATE`), Idempotência Persistente baseada em Hash Canônico SHA-256.
 
 Consulte a documentação técnica detalhada do projeto:
+- 📋 **Guia de Avaliação Técnica (Critérios da Seção 14 / 100 pontos)**: [docs/evaluation-guide.md](docs/evaluation-guide.md)
 - 🏛️ **Decisões Técnicas & Arquitetura**: [ARCHITECTURE.md](ARCHITECTURE.md)
 - 🗄️ **Modelagem do Banco de Dados & Invariantes**: [docs/database-modeling.md](docs/database-modeling.md)
 - 🔄 **Fluxo do Endpoint de Transações**: [docs/wagering-transactions-flow.md](docs/wagering-transactions-flow.md)
