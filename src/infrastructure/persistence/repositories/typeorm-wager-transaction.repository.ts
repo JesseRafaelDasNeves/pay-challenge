@@ -1,6 +1,7 @@
 import { EntityManager } from 'typeorm';
 import { WagerTransactionRepositoryPort } from '../../../application/ports/wager-transaction.repository.port.js';
 import { WagerTransaction } from '../../../domain/wagering/wager-transaction.aggregate.js';
+import { WagerTransactionStatus } from '../../../domain/wagering/wager-transaction-status.enum.js';
 import { WagerTransactionOrmEntity } from '../entities/wager-transaction.orm-entity.js';
 
 export class TypeOrmWagerTransactionRepository implements WagerTransactionRepositoryPort {
@@ -48,7 +49,7 @@ export class TypeOrmWagerTransactionRepository implements WagerTransactionReposi
 
   public async findPendingReferences(limit: number): Promise<WagerTransaction[]> {
     const entities = await this.manager.find(WagerTransactionOrmEntity, {
-      where: { status: 'PENDING_REFERENCE' },
+      where: { status: WagerTransactionStatus.PendingReference },
       order: { createdAt: 'ASC' },
       take: limit,
     });

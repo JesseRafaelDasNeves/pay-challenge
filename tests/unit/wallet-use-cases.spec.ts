@@ -7,7 +7,10 @@ import type { UnitOfWorkPort, TransactionalContext } from '../../src/application
 import { Wallet } from '../../src/domain/wallet/wallet.aggregate.js';
 import { Money } from '../../src/domain/shared/money.value-object.js';
 import { WalletLedgerEntry } from '../../src/domain/wallet/wallet-ledger.entity.js';
+import { LedgerDirection } from '../../src/domain/wallet/ledger-direction.enum.js';
 import { WagerTransaction } from '../../src/domain/wagering/wager-transaction.aggregate.js';
+import { WagerTransactionKind } from '../../src/domain/wagering/wager-transaction-kind.enum.js';
+import { WagerTransactionStatus } from '../../src/domain/wagering/wager-transaction-status.enum.js';
 
 class MockWalletRepo implements WalletRepositoryPort {
   public storage = new Map<string, Wallet>();
@@ -89,12 +92,12 @@ describe('Wallet Use Cases (CreateWallet & GetWallet)', () => {
 
     // Verifica que gerou transação OPENING interna
     expect(uow.transactions.length).toBe(1);
-    expect(uow.transactions[0]?.kind).toBe('OPENING');
-    expect(uow.transactions[0]?.status).toBe('PROCESSED');
+    expect(uow.transactions[0]?.kind).toBe(WagerTransactionKind.Opening);
+    expect(uow.transactions[0]?.status).toBe(WagerTransactionStatus.Processed);
 
     // Verifica que gerou ledger correspondente
     expect(uow.ledgerEntries.length).toBe(1);
-    expect(uow.ledgerEntries[0]?.direction).toBe('CREDIT');
+    expect(uow.ledgerEntries[0]?.direction).toBe(LedgerDirection.Credit);
     expect(uow.ledgerEntries[0]?.money.amount).toBe('1000.00');
     expect(uow.ledgerEntries[0]?.balanceAfter.amount).toBe('1000.00');
   });

@@ -7,6 +7,7 @@ import {
 import { ProcessWagerTransactionUseCase } from './process-wager-transaction.use-case.js';
 import { UNIT_OF_WORK_PORT, type UnitOfWorkPort } from '../ports/unit-of-work.port.js';
 import { FailureCode } from '../../domain/wagering/failure-code.enum.js';
+import { WagerTransactionStatus } from '../../domain/wagering/wager-transaction-status.enum.js';
 import { WagerTransactionRejected } from '../../domain/messaging/integration-event.abstract.js';
 import { OutboxMessage } from '../../domain/messaging/outbox-message.entity.js';
 
@@ -42,7 +43,7 @@ export class ReprocessPendingReferencesUseCase {
         pendingTx.referenceExternalTransactionId,
       );
 
-      if (ref && ref.status === 'PROCESSED') {
+      if (ref && ref.status === WagerTransactionStatus.Processed) {
         // A referência chegou! Reprocessamos a transação
         try {
           await this.processWagerUseCase.execute({
@@ -73,7 +74,7 @@ export class ReprocessPendingReferencesUseCase {
         if (ageInMs > maxTtlMs) {
           await this.unitOfWork.executeInTransaction(async (ctx) => {
             const txToReject = await ctx.transactions.findById(pendingTx.id);
-            if (txToReject && txToReject.status === 'PENDING_REFERENCE') {
+            if (txToReject && txToReject.status === WagerTransactionStatus.PendingReference) {
               txToReject.reject(FailureCode.ReferenceNotFound, now);
               await ctx.transactions.save(txToReject);
 
