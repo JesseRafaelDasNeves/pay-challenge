@@ -11,6 +11,11 @@ import { TypeOrmWalletLedgerRepository } from '../../src/infrastructure/persiste
 import { WagerTransactionKind } from '../../src/domain/wagering/wager-transaction-kind.enum.js';
 import { WagerTransactionStatus } from '../../src/domain/wagering/wager-transaction-status.enum.js';
 import { FailureCode } from '../../src/domain/wagering/failure-code.enum.js';
+import { ProcessBetTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-bet-transaction.use-case.js';
+import { ProcessWinTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-win-transaction.use-case.js';
+import { ProcessLossTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-loss-transaction.use-case.js';
+import { ProcessRefundTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-refund-transaction.use-case.js';
+import { ProcessRollbackTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-rollback-transaction.use-case.js';
 
 describe('Testes de Concorrência Real no PostgreSQL', () => {
   let uow: TypeOrmUnitOfWork;
@@ -26,7 +31,14 @@ describe('Testes de Concorrência Real no PostgreSQL', () => {
     const walletRepo = new TypeOrmWalletRepository(AppDataSource.manager);
     const ledgerRepo = new TypeOrmWalletLedgerRepository(AppDataSource.manager);
 
-    processWagerUseCase = new ProcessWagerTransactionUseCase(uow);
+    processWagerUseCase = new ProcessWagerTransactionUseCase(
+      uow,
+      new ProcessBetTransactionUseCase(),
+      new ProcessWinTransactionUseCase(),
+      new ProcessLossTransactionUseCase(),
+      new ProcessRefundTransactionUseCase(),
+      new ProcessRollbackTransactionUseCase(),
+    );
     createWalletUseCase = new CreateWalletUseCase(uow, walletRepo);
     reconcileWalletUseCase = new ReconcileWalletUseCase(walletRepo, ledgerRepo);
   });

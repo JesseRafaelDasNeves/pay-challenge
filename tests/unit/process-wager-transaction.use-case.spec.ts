@@ -19,6 +19,11 @@ import { OutboxMessage } from '../../src/domain/messaging/outbox-message.entity.
 import { WagerTransactionKind } from '../../src/domain/wagering/wager-transaction-kind.enum.js';
 import { WagerTransactionStatus } from '../../src/domain/wagering/wager-transaction-status.enum.js';
 import { FailureCode } from '../../src/domain/wagering/failure-code.enum.js';
+import { ProcessBetTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-bet-transaction.use-case.js';
+import { ProcessWinTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-win-transaction.use-case.js';
+import { ProcessLossTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-loss-transaction.use-case.js';
+import { ProcessRefundTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-refund-transaction.use-case.js';
+import { ProcessRollbackTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-rollback-transaction.use-case.js';
 
 // In-Memory Test Doubles
 class InMemoryWalletRepository implements WalletRepositoryPort {
@@ -177,7 +182,14 @@ describe('ProcessWagerTransactionUseCase', () => {
     inboxRepo = new InMemoryInboxRepository();
     outboxRepo = new InMemoryOutboxRepository();
     uow = new InMemoryUnitOfWork(walletsRepo, ledgersRepo, txRepo, inboxRepo, outboxRepo);
-    useCase = new ProcessWagerTransactionUseCase(uow);
+    useCase = new ProcessWagerTransactionUseCase(
+      uow,
+      new ProcessBetTransactionUseCase(),
+      new ProcessWinTransactionUseCase(),
+      new ProcessLossTransactionUseCase(),
+      new ProcessRefundTransactionUseCase(),
+      new ProcessRollbackTransactionUseCase(),
+    );
 
     // Inicializa wallet com saldo de 100.00 BRL
     const wallet = Wallet.open({
@@ -214,7 +226,9 @@ describe('ProcessWagerTransactionUseCase', () => {
 
     // Verifica lançamento no ledger
     expect(ledgersRepo.entries.length).toBe(1);
-    expect(ledgersRepo.entries[0]?.direction).toBe('DEBIT');
+    expect(ledgersRepo.entries[0]?.direction).toBe(
+      'DEBIT' as (typeof ledgersRepo.entries)[number]['direction'],
+    );
     expect(ledgersRepo.entries[0]?.money.amount).toBe('25.00');
 
     // Verifica outbox de eventos
@@ -270,7 +284,9 @@ describe('ProcessWagerTransactionUseCase', () => {
     expect(result.status).toBe(WagerTransactionStatus.Processed);
     expect(result.balance.amount).toBe('150.00');
     expect(ledgersRepo.entries.length).toBe(1);
-    expect(ledgersRepo.entries[0]?.direction).toBe('CREDIT');
+    expect(ledgersRepo.entries[0]?.direction).toBe(
+      'CREDIT' as (typeof ledgersRepo.entries)[number]['direction'],
+    );
   });
 
   it('deve processar LOSS marcando como PROCESSED sem alterar saldo nem ledger', async () => {
