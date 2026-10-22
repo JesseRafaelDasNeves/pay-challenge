@@ -19,6 +19,7 @@ src/
 │   ├── ports/         # Interfaces dos repositórios e Unit of Work
 │   ├── dtos/          # Contratos validados com class-validator
 │   └── use-cases/     # Orquestração de negócio e controle transacional
+│       └── wager-kinds/ # Use Cases especializados por tipo de transação (BET, WIN, LOSS, REFUND, ROLLBACK)
 └── infrastructure/    # Adaptadores Técnicos e Infraestrutura
     ├── persistence/   # TypeORM (Data Mapper), Migrations PostgreSQL
     ├── messaging/     # AWS SQS FIFO com LocalStack, Workers Outbox/Inbox
@@ -28,6 +29,39 @@ src/
 
 ### Isolamento do Domínio Puro
 As entidades de domínio (`Wallet`, `WagerTransaction`, `WalletLedgerEntry`) não utilizam decorators do NestJS nem do TypeORM. A persistência adota o padrão **Data Mapper** via entidades ORM separadas (`WalletOrmEntity`, etc.), garantindo que as regras de negócio permaneçam 100% testáveis em memória sem necessidade de infraestrutura pesada.
+
+### Orquestração do Pipeline Transacional e Delegação por `kind`
+O caso de uso `ProcessWagerTransactionUseCase` atua como um **Orquestrador do Pipeline Transacional** (responsável por telemetria, abertura de transação via `UnitOfWork`, lock pessimista da carteira, verificação de idempotência, deduplicação via *Transactional Inbox* e instanciação inicial de `WagerTransaction`) e delega a execução da regra de negócio de cada tipo (`WagerTransactionKind`) para **Use Cases especializados** que operam dentro do mesmo `TransactionalContext` já aberto e com a carteira bloqueada:
+
+```mermaid
+flowchart TD
+    Orch["ProcessWagerTransactionUseCase (Orquestrador)"]
+    UoW["UnitOfWork.executeInTransaction(ctx)"]
+    Guards["1. Lock Pessimista na Wallet\n2. Checagem de Idempotência\n3. Deduplicação Inbox\n4. Criação WagerTransaction (PENDING)"]
+    Router{"Delegação por kind"}
+
+    BetUC["ProcessBetTransactionUseCase"]
+    WinUC["ProcessWinTransactionUseCase"]
+    LossUC["ProcessLossTransactionUseCase"]
+    RefundUC["ProcessRefundTransactionUseCase"]
+    RollbackUC["ProcessRollbackTransactionUseCase"]
+    Base["BaseWagerTransactionKindUseCase (Base / Helpers Comuns)"]
+
+    Orch --> UoW --> Guards --> Router
+    Router -->|BET| BetUC
+    Router -->|WIN| WinUC
+    Router -->|LOSS| LossUC
+    Router -->|REFUND| RefundUC
+    Router -->|ROLLBACK| RollbackUC
+
+    BetUC -.-> Base
+    WinUC -.-> Base
+    LossUC -.-> Base
+    RefundUC -.-> Base
+    RollbackUC -.-> Base
+```
+
+> **Garantia de Atomicidade e Lock Pessimista:** Os Use Cases específicos por `kind` recebem o `TransactionalContext` (`ctx`), a `Wallet` já bloqueada com `pessimistic_write` e a instância de `WagerTransaction`. Assim, todas as operações de cada tipo executam **na mesma transação de banco de dados**, sem abrir transações aninhadas nem perder o lock pessimista.
 
 ---
 

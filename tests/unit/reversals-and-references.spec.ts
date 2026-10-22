@@ -8,22 +8,35 @@ import type { UnitOfWorkPort, TransactionalContext } from '../../src/application
 import type { WalletRepositoryPort } from '../../src/application/ports/wallet.repository.port.js';
 import type { WalletLedgerRepositoryPort } from '../../src/application/ports/wallet-ledger.repository.port.js';
 import type { WagerTransactionRepositoryPort } from '../../src/application/ports/wager-transaction.repository.port.js';
-import type { InboxRepositoryPort } from '../../src/application/ports/inbox.repository.port.js';
-import type { OutboxRepositoryPort } from '../../src/application/ports/outbox.repository.port.js';
 import { Wallet } from '../../src/domain/wallet/wallet.aggregate.js';
 import { Money } from '../../src/domain/shared/money.value-object.js';
 import { WagerTransaction } from '../../src/domain/wagering/wager-transaction.aggregate.js';
 import { WalletLedgerEntry } from '../../src/domain/wallet/wallet-ledger.entity.js';
-import { OutboxMessage } from '../../src/domain/messaging/outbox-message.entity.js';
+import { LedgerDirection } from '../../src/domain/wallet/ledger-direction.enum.js';
 import { WagerTransactionKind } from '../../src/domain/wagering/wager-transaction-kind.enum.js';
 import { WagerTransactionStatus } from '../../src/domain/wagering/wager-transaction-status.enum.js';
 import { FailureCode } from '../../src/domain/wagering/failure-code.enum.js';
+import { ProcessBetTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-bet-transaction.use-case.js';
+import { ProcessWinTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-win-transaction.use-case.js';
+import { ProcessLossTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-loss-transaction.use-case.js';
+import { ProcessRefundTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-refund-transaction.use-case.js';
+import { ProcessRollbackTransactionUseCase } from '../../src/application/use-cases/wager-kinds/process-rollback-transaction.use-case.js';
 
 class MockWalletRepository implements WalletRepositoryPort {
   public storage = new Map<string, Wallet>();
   public async findById(id: string): Promise<Wallet | null> {
     const f = this.storage.get(id);
-    return f ? Wallet.rehydrate({ ...f, balance: f.balance }) : null;
+    return f
+      ? Wallet.rehydrate({
+          id: f.id,
+          playerId: f.playerId,
+          currency: f.currency,
+          balance: f.balance,
+          version: f.version,
+          createdAt: f.createdAt,
+          updatedAt: f.updatedAt,
+        })
+      : null;
   }
   public async findByPlayerIdAndCurrency(): Promise<Wallet | null> { return null; }
   public async save(wallet: Wallet): Promise<void> { this.storage.set(wallet.id, wallet); }
@@ -87,7 +100,14 @@ describe('Reversões (REFUND e ROLLBACK) e Referências Fora de Ordem', () => {
     ledgersRepo = new MockLedgerRepository();
     txRepo = new MockTransactionRepository();
     const uow = new MockUnitOfWork(walletsRepo, ledgersRepo, txRepo);
-    useCase = new ProcessWagerTransactionUseCase(uow);
+    useCase = new ProcessWagerTransactionUseCase(
+      uow,
+      new ProcessBetTransactionUseCase(),
+      new ProcessWinTransactionUseCase(),
+      new ProcessLossTransactionUseCase(),
+      new ProcessRefundTransactionUseCase(),
+      new ProcessRollbackTransactionUseCase(),
+    );
 
     const wallet = Wallet.open({
       id: walletId,
@@ -151,7 +171,7 @@ describe('Reversões (REFUND e ROLLBACK) e Referências Fora de Ordem', () => {
     expect(refundRes.status).toBe(WagerTransactionStatus.Processed);
     expect(refundRes.balance.amount).toBe('100.00'); // Estorno devolveu 25.00
     expect(ledgersRepo.entries.length).toBe(2); // 1 DEBIT + 1 CREDIT
-    expect(ledgersRepo.entries[1]?.direction).toBe('CREDIT');
+    expect(ledgersRepo.entries[1]?.direction).toBe(LedgerDirection.Credit);
   });
 
   it('deve rejeitar REFUND se o valor diferir do valor da aposta referenciada', async () => {
@@ -217,7 +237,7 @@ describe('Reversões (REFUND e ROLLBACK) e Referências Fora de Ordem', () => {
     expect(rollbackRes.status).toBe(WagerTransactionStatus.Processed);
     expect(rollbackRes.balance.amount).toBe('100.00');
     expect(ledgersRepo.entries.length).toBe(2);
-    expect(ledgersRepo.entries[1]?.direction).toBe('DEBIT');
+    expect(ledgersRepo.entries[1]?.direction).toBe(LedgerDirection.Debit);
   });
 
   it('deve rejeitar ROLLBACK que produziria saldo negativo com código INSUFFICIENT_FUNDS_FOR_REVERSAL', async () => {
