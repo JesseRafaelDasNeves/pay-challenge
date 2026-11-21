@@ -1,0 +1,65 @@
+schema: spec-driven
+
+context: |
+  Idioma e nomenclatura:
+  - Escreva todos os artefatos OpenSpec (proposal, specs, design, tasks) em português do Brasil (pt-BR), preservando apenas as palavras-chave estruturais exigidas pelo parser do OpenSpec (`## Purpose`, `## Requirements`, `## ADDED/MODIFIED/REMOVED/RENAMED Requirements`, `### Requirement:`, `#### Scenario:`, `SHALL`/`MUST`, `WHEN`/`THEN`/`AND`).
+  - Todos os nomes relacionados a código-fonte (arquivos, classes, interfaces, métodos, variáveis, DTOs, enums, eventos, rotas HTTP, campos JSON, testes) e banco de dados (tabelas, colunas, constraints, índices, triggers, migrations) devem ser sempre em inglês.
+
+  Design de código, Clean Code e SOLID:
+  - Crie um Use Case específico e dedicado para cada operação (por exemplo: Create, Get, Update, Delete, Reconcile ou handlers especializados por tipo em `wager-kinds/`). Evite serviços genéricos que acumulam múltiplas ações.
+  - Aplique sempre Clean Code: classes pequenas e coesas, métodos curtos e legíveis, baixo acoplamento, sem efeitos colaterais ocultos nem duplicação de regras.
+  - Siga rigorosamente os princípios SOLID — especialmente SRP (cada classe deve servir a um único objetivo), OCP (estender comportamentos por composição/novos handlers) e DIP (a camada `application` depende apenas das interfaces em `src/application/ports/`).
+
+  Arquitetura e isolamento de domínio:
+  - Siga Clean Architecture / Arquitetura Hexagonal (Ports & Adapters) + DDD.
+  - Mantenha `src/domain/` 100% puro: proibido usar decorators ou imports de NestJS, TypeORM, AWS SDK ou qualquer framework de infraestrutura.
+  - Persistência usa o padrão Data Mapper com entidades ORM separadas em `src/infrastructure/persistence/entities/`.
+  - Agregados e entidades de domínio devem usar construtor `private`/`protected` com factories estáticas (`open`/`create`, `from`, `rehydrate`), onde `rehydrate` apenas reconstrói estado persistido sem revalidar transições.
+  - Runtime e test runner são Bun (`bun test`) com TypeScript em modo estrito e ESM (`"type": "module"`): imports relativos devem manter o sufixo `.js`.
+  - ORM fixo em TypeORM com PostgreSQL (proibido introduzir Prisma ou outros ORMs). Validação de entrada é estrita (`whitelist` e `forbidNonWhitelisted`).
+
+  Invariantes financeiras, concorrência e resiliência (invioláveis):
+  - Nunca use `number`, `float` ou `double` para valores monetários: use sempre o Value Object `Money` (`decimal.js`, escala fixa de 2 casas decimais, moeda ISO-4217) no código e `NUMERIC(18, 2)` + `VARCHAR(3)` no PostgreSQL.
+  - Saldo de carteira nunca pode ser negativo (validado no domínio e reforçado por `CHECK` no PostgreSQL).
+  - O ledger (`wallet_ledger_entries`) é estritamente imutável (append-only): nunca sobrescrever ou excluir lançamentos; manter constraint aritmética e trigger de imutabilidade no banco.
+  - Garantias de unicidade, imutabilidade e não-negatividade devem ser aplicadas também no schema do PostgreSQL por meio de migrations versionadas e reversíveis, nunca apenas em código de aplicação.
+  - Toda solução deve permanecer correta com múltiplas instâncias da aplicação em paralelo.
+  - A unidade de concorrência é o `walletId` (lock pessimista `SELECT ... FOR UPDATE` dentro de `UnitOfWork`); proibido lock global entre carteiras e proibido `read -> calculate -> update` sem controle de concorrência.
+  - Idempotência deve ser persistente no PostgreSQL (chave única + hash canônico SHA-256 do payload); proibido usar cache em memória como garantia de idempotência.
+  - Não confiar apenas em SQS FIFO para consistência: manter Transactional Inbox (deduplicação na mesma transação SQL e ACK no SQS somente após commit) e Transactional Outbox (`FOR UPDATE SKIP LOCKED`, nunca publicar eventos antes do commit da transação financeira).
+
+  Fronteiras de segurança:
+  - Se autenticação for adicionada, integrar um Identity Provider externo (OIDC/OAuth2, como Keycloak ou Zitadel) via Guards do NestJS; nunca criar tabela própria de usuários com hash de senha.
+  - Endpoints `/health/live` e `/health/ready` permanecem públicos; mensagens vindas das filas SQS são canal interno confiável (mantendo todas as validações de domínio).
+
+rules:
+  proposal:
+    - Escreva em português do Brasil, mantendo nomes de símbolos, arquivos, rotas e tabelas em inglês.
+    - Declare explicitamente o que está fora de escopo.
+    - Indique impactos em migrations de banco de dados, compatibilidade de API/mensagens SQS e novas dependências.
+  specs:
+    - "Escreva o conteúdo em português do Brasil, mas preserve estritamente a estrutura e palavras-chave exigidas pelo OpenSpec (`## Purpose`, `## Requirements`, `## ADDED/MODIFIED/REMOVED/RENAMED Requirements`, `### Requirement:`, `#### Scenario:`, `SHALL`/`MUST`, `WHEN`/`THEN`/`AND`)."
+    - Descreva comportamentos observáveis e invariantes de negócio sem acoplar requisitos a detalhes internos de TypeORM ou NestJS.
+    - Sempre cubra cenários de erro, validação, idempotência e concorrência quando aplicáveis à capacidade.
+    - Mantenha nomes de rotas, payloads, códigos de falha, tabelas e campos técnicos em inglês.
+  design:
+    - Escreva em português do Brasil, com nomes de classes, arquivos, rotas, tabelas, colunas e constraints em inglês.
+    - Modele cada ação com um Use Case específico e classes coesas seguindo Clean Code e SOLID (especialmente responsabilidade única e inversão de dependência via ports).
+    - Documente limites transacionais (`UnitOfWork`), estratégia de lock por `walletId`, impacto em Inbox/Outbox e reversibilidade de migrations quando houver persistência ou mensageria.
+    - Garanta isolamento total da camada `src/domain/` sem acoplamento com frameworks.
+  tasks:
+    - Escreva em português do Brasil, referenciando arquivos, símbolos e comandos reais do projeto em inglês.
+    - Quebre o trabalho em tarefas pequenas, coesas e ordenadas por camada (domínio, portas, use cases específicos, infraestrutura/migrations e testes).
+    - Exija testes adequados ao escopo da mudança (`bun run test:unit`, `bun run test:integration` e/ou `bun run test:concurrency`).
+
+operations:
+  apply:
+    guidance:
+      - Implemente um Use Case dedicado para cada operação e mantenha classes pequenas, coesas e aderentes a Clean Code e SOLID (uma única responsabilidade por classe).
+      - Nomeie todos os arquivos, classes, métodos, variáveis, rotas, tabelas, colunas, constraints e migrations estritamente em inglês, mantendo imports relativos ESM com sufixo `.js`.
+      - Preserve `src/domain/` puro (sem decorators ou imports de NestJS/TypeORM) e garanta invariantes críticas também no schema do PostgreSQL via migrations reversíveis.
+      - Execute primeiro testes unitários focados (`bun run test:unit`) e, quando a mudança tocar persistência, constraints ou concorrência, valide também com `bun run test:integration` e `bun run test:concurrency`.
+  archive:
+    guidance:
+      - Garanta que `openspec validate --specs` passe sem erros após sincronizar os deltas para `openspec/specs/`.
+      - Apresente um resumo objetivo em português do Brasil listando as specs sincronizadas, o caminho da mudança arquivada e eventuais avisos.
