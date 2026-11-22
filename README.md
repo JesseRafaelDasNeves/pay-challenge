@@ -1,4 +1,4 @@
-# Distributed Wagering Processor
+# Serviço financeiro distribuído
 
 Serviço financeiro distribuído de alta consistência para processamento de apostas de múltiplos provedores de jogos, implementado com **Bun**, **TypeScript**, **NestJS**, **TypeORM**, **PostgreSQL** e **AWS SQS FIFO (LocalStack)**.
 
@@ -12,12 +12,14 @@ Serviço financeiro distribuído de alta consistência para processamento de apo
 - **Mensageria**: AWS SQS FIFO emulado via [LocalStack 3.8.1](https://localstack.cloud)
 - **Arquitetura**: Clean Architecture (Ports & Adapters) + DDD (Domain-Driven Design)
 - **Padrões de Resiliência**: Transactional Inbox, Transactional Outbox com `FOR UPDATE SKIP LOCKED`, Lock Pessimista por Carteira (`SELECT ... FOR UPDATE`), Idempotência Persistente baseada em Hash Canônico SHA-256.
+- **Spec-Driven Development**: [OpenSpec](https://openspec.dev) (`schema: spec-driven`, com especificações em `openspec/specs/` e propostas em `openspec/changes/`).
 
 Consulte a documentação técnica detalhada do projeto:
 - 📋 **Guia de Avaliação Técnica (Critérios da Seção 14 / 100 pontos)**: [docs/evaluation-guide.md](docs/evaluation-guide.md)
 - 🏛️ **Decisões Técnicas & Arquitetura**: [ARCHITECTURE.md](ARCHITECTURE.md)
 - 🗄️ **Modelagem do Banco de Dados & Invariantes**: [docs/database-modeling.md](docs/database-modeling.md)
 - 🔄 **Fluxo do Endpoint de Transações**: [docs/wagering-transactions-flow.md](docs/wagering-transactions-flow.md)
+- 📐 **Configuração e Regras do OpenSpec**: [openspec/config.yaml](openspec/config.yaml)
 
 ---
 
@@ -89,6 +91,29 @@ bun run test:integration
 
 # Testes de concorrência real (Disputa de saldo simultânea e 50 requisições paralelas):
 bun run test:concurrency
+```
+
+---
+
+## 📐 Desenvolvimento Orientado a Especificações (OpenSpec)
+
+Este projeto utiliza o **OpenSpec** (`schema: spec-driven`) para planejar mudanças e manter especificações comportamentais vivas em conjunto com agentes de IA.
+
+- **Configuração e invariantes**: [openspec/config.yaml](openspec/config.yaml) — define artefatos em português do Brasil, nomenclatura em inglês para código e banco de dados, Use Cases específicos por operação, Clean Code, SOLID e as invariantes financeiras e transacionais do projeto.
+- **Especificações principais**: `openspec/specs/` — fonte da verdade comportamental organizada por capacidade de negócio.
+- **Propostas de mudança**: `openspec/changes/` — artefatos de planejamento (`proposal`, delta `specs`, `design`, `tasks`) e histórico arquivado em `openspec/changes/archive/`.
+- **Skills de agente**: `.agents/skills/` — workflows do perfil `core` (`explore`, `propose`, `apply`, `update`, `sync`, `archive`).
+
+### Comandos úteis do CLI
+
+```bash
+# Listar especificações consolidadas e mudanças ativas:
+openspec list --specs
+openspec list
+
+# Validar especificações e saúde da configuração OpenSpec:
+openspec validate --specs
+openspec doctor
 ```
 
 ---
